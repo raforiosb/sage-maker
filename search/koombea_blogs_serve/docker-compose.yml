@@ -1,0 +1,24 @@
+services:
+    koombea_blogs_serve_component:
+        build: 
+            context: .
+            dockerfile: Dockerfile
+        volumes: 
+            - type: bind
+              source: .
+              target: /opt/ml/code
+            - type: bind
+              source: ./models
+              target: /opt/ml/model
+        ports: 
+            - 8080:8080
+        env_file: 
+            - ./vars.staging.env
+            - ./vars.env
+        networks:
+            - koombea_blogs_serve_net
+        entrypoint: 
+            - serve
+
+networks:
+    koombea_blogs_serve_net:

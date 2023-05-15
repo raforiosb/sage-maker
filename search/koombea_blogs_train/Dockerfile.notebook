@@ -1,0 +1,49 @@
+FROM jupyter/minimal-notebook:latest
+
+WORKDIR /home/koombea
+
+USER root
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    gcc  \
+    mono-mcs \
+    build-essential \
+    ca-certificates \
+    wget \
+    pkg-config
+
+USER $NB_UID
+
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
+ARG conda_env=python38
+ARG py_ver=3.8.10
+
+RUN conda create --quiet --yes -p "${CONDA_DIR}/envs/${conda_env}" python=${py_ver} \
+    ipython ipykernel ipywidgets nodejs && conda clean --all -f -y
+
+RUN "${CONDA_DIR}/envs/${conda_env}/bin/python" -m ipykernel install --user --name="${conda_env}" && \
+    fix-permissions "${CONDA_DIR}" && \
+    fix-permissions "/home/${NB_USER}"
+
+COPY requirements.txt .
+COPY requirements-notebook.txt .
+COPY requirements-problems.txt .
+
+RUN "${CONDA_DIR}/envs/${conda_env}/bin/pip" install -U pip
+RUN "${CONDA_DIR}/envs/${conda_env}/bin/pip" install -r requirements-notebook.txt
+RUN "${CONDA_DIR}/envs/${conda_env}/bin/python" -m spacy download en_core_web_sm
+RUN "${CONDA_DIR}/envs/${conda_env}/bin/python" -m spacy download es_core_news_sm
+RUN "${CONDA_DIR}/envs/${conda_env}/bin/pip" install -r requirements-problems.txt
+RUN conda install -p "${CONDA_DIR}/envs/${conda_env}" -c pytorch faiss-cpu -y && \
+    conda clean --all -f -y
+
+ENV PATH "${CONDA_DIR}/envs/${conda_env}/bin:${PATH}"
+ENV CONDA_DEFAULT_ENV ${conda_env}
+RUN jupyter labextension install @jupyter-widgets/jupyterlab-manager
+RUN jupyter labextension install jupyter-matplotlib
+RUN jupyter nbextension enable --py widgetsnbextension
+
+COPY . .

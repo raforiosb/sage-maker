@@ -1,0 +1,13 @@
+*.env
+data
+Dockerfile
+.env
+.vscode
+wandb
+tests
+test_data
+notebooks
+Dockerfile*
+docker-compose*
+workspace.code*
+.*

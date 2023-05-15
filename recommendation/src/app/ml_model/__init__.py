@@ -1,0 +1,1 @@
+from app.ml_model.models import ScoringModel

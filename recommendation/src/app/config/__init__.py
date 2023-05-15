@@ -1,0 +1,1 @@
+from app.config.config_variables import DATABASE_CONFIG

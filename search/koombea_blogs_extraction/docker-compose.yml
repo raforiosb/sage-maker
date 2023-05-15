@@ -1,0 +1,41 @@
+
+services:
+    koombea_blogs_extraction_component:
+        build: 
+            context: .
+            dockerfile: Dockerfile
+        env_file: 
+            - ./vars.staging.env
+            - ./vars.env
+        networks:
+            - koombea_blogs_extraction_net
+        volumes: 
+            - type: bind
+              source: .
+              target: /opt/ml
+
+#    koombea_blogs_extraction_notebook:
+#        build: 
+#            context: .
+#            dockerfile: Dockerfile.notebook
+#        volumes: 
+#            - type: bind
+#              source: .
+#              target: /home/koombea
+#        env_file: 
+#            - ./vars.staging.env
+#            - ./vars.env
+#        environment: 
+#            - JUPYTER_ENABLE_LAB=yes
+#        networks:
+#            - koombea_blogs_extraction_net
+#        ports: 
+#            - 8880:8888
+#        entrypoint: 
+#            - jupyter
+#            - lab 
+#            - "-ip=0.0.0.0"
+#            - --allow-root
+
+networks:
+    koombea_blogs_extraction_net:

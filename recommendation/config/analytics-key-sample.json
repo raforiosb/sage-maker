@@ -1,0 +1,12 @@
+{
+    "type": "service_account",
+    "project_id": "koombea-blogs-analysis",
+    "private_key_id": "XXXXXXXXXX",
+    "private_key": "-----BEGIN PRIVATE KEY-----\n-----END PRIVATE KEY-----\n",
+    "client_email": "XXXXXXXXXX",
+    "client_id": "XXXXXXXXXXXX",
+    "auth_uri": "XXXXXXXXXXXXX",
+    "token_uri": "XXXXXXXXXXXXXXXXX",
+    "auth_provider_x509_cert_url": "XXXXXXXXXXXXXX",
+    "client_x509_cert_url": "XXXXXXXXXXXXXXXXXXXXXXXXXX"
+}

@@ -1,0 +1,114 @@
+#! /usr/bin/env python
+import os
+import signal
+import time 
+import sys
+import multiprocessing
+import subprocess
+
+
+from app.utils import logger
+from app.cronjob_app import execute_cache
+
+"""
+Structure Path:
+    /opt/ml
+        /code
+            user_code
+        /model
+            model_artifacts
+"""
+# Get cores count
+cpu_count = multiprocessing.cpu_count()
+# Set workers and timeout
+model_server_timeout = os.environ.get('MODEL_SERVER_TIMEOUT', 300)
+model_server_workers = int(os.environ.get('MODEL_SERVER_WORKERS', cpu_count//2))
+
+def sigterm_handler(nginx_pid, gunicorn_pid):
+    """Handling nginx pid and gunicorn pid to terminate
+    Args:
+        nginx_pid (pid): nginx signal pid
+        gunicorn_pid (pid): gunicorn signal pid
+    """
+    try:
+        os.kill(nginx_pid, signal.SIGQUIT)
+    except OSError as e:
+        logger.error(f"Error: {e}")
+
+    try:
+        os.kill(gunicorn_pid, signal.SIGTERM)
+    except OSError as e:
+        logger.error(f"Error: {e}")
+
+    sys.exit(0)
+
+def start_slave_process(cmd):
+    """
+    Start process
+    Args:
+        cmd -- command to execute this will be redis-server, celery-workers, celery-beat
+    Returns:
+        p -- process
+    """
+    p = subprocess.Popen(cmd, shell=True, stderr=subprocess.STDOUT)
+    # Sleep
+    time.sleep(15)
+    if p.poll() is not None:
+        raise RuntimeError("Could not start {0}".format(cmd))
+    else:
+        logger.info("{0} started succesfully".format(cmd))
+    return p
+    
+def main():
+    """
+    Start servers and server utilities
+    """
+    logger.info("Starting the inference server with {} workers".format(model_server_workers))
+
+    # Start redis server
+    start_slave_process(cmd="redis-server /etc/redis/redis.conf")
+    
+    # Start celery workers
+    start_slave_process(cmd="celery -A app.cronjob_app.celery_app worker "
+                           "--loglevel INFO")
+    # Start celery beat
+    start_slave_process(cmd="celery -A app.cronjob_app.celery_app beat "
+                            "--loglevel INFO")
+    
+    # link the log streams to stdout/err so they will be logged to the container logs
+    subprocess.check_call(['ln', '-sf', '/dev/stdout', '/var/log/nginx/access.log'])
+    subprocess.check_call(['ln', '-sf', '/dev/stderr', '/var/log/nginx/error.log'])
+
+    # nginx process
+    nginx = subprocess.Popen(['nginx', '-c', '/opt/ml/input/config/nginx.conf'])
+    
+    # gunicorn process
+    gunicorn = subprocess.Popen(['gunicorn',
+                                 '--timeout', str(model_server_timeout),
+                                 '-k', 'uvicorn.workers.UvicornWorker',
+                                 '-b', 'unix:/tmp/gunicorn.sock',
+                                 '-w', str(model_server_workers),
+                                 'wsgi:app',
+                                 '--log-level', 'INFO']) # '--reload'])
+                                 
+    # Test celery app
+    execute_cache.delay("Caching Recommendations")
+    
+    signal.signal(signal.SIGTERM, lambda a, b: sigterm_handler(nginx.pid, gunicorn.pid))
+
+    # If either subprocess exits, so do we.
+    pids = set([nginx.pid, gunicorn.pid])
+    while True:
+        pid, _ = os.wait()
+        if pid in pids:
+            break
+
+    sigterm_handler(nginx.pid, gunicorn.pid)
+    logger.info('Inference server exiting')
+    
+# The main routine just invokes the start function.
+if __name__ == '__main__':
+    main()
+
+
+    
